@@ -38,6 +38,9 @@ int main(void)
 {
 	// initialize PORTB as outputs for debug purposes
 	DDRB = 0b111;
+	PORTB = 0b111;
+	fullRotation();
+	//PORTB = 0;
 	//DDRA = 0b1111;
 	//stepperPortOutput();
 	/* Replace with your application code */
@@ -48,65 +51,61 @@ int main(void)
 	msgStatus = 0;	  // receive status
 	outstandingRqsts = 0;
 	msgRqst = 0;
-	fullRotation();
+	
+	PORTB = 0;
 	
 	
 	while(1) { // infinite loop checking for outstanding requests
 		
-		PORTB = (outstandingRqsts << DDRB0); //somehow fixes code....
+		PORTB |= (outstandingRqsts << DDRB2); //somehow fixes code....
 		
 		if (outstandingRqsts) { // if outstanding request, handle request
 			// CHECK IF BUSY --> SEND BUSY RESPONSE
+			//PORTB |= (1<<DDRB0);
+			//PORTB &= ~(1<<DDRB0);
 			switch (msgStatus){
 				case (FRAMEERORR):
 					clearReceiveBuffer();
-					PORTB = (1<<DDRB0);
+					PORTB &= ~(1<<DDRB2);
 					USART1_transmit(slaveFrameError);
 					break;
 				case (DATAOVERRUNERROR):
 					clearReceiveBuffer();
-					PORTB = (1<<DDRB1);
+					PORTB &= ~(1<<DDRB2);
 					USART1_transmit(slaveDataOverRunError);
 					break;
 				case (PARITYERROR):
 					clearReceiveBuffer();
-					PORTB = (1<<DDRB2);
+					PORTB &= ~(1<<DDRB2);
 					USART1_transmit(slaveParityError);
 					break;
 				default: // no receive error
+						PORTB = 0b111;
+						//PORTB = 0;
 						switch(msgRqst){
 							case (DISPENSE):
-								dispense();
+								fullRotation();
+								USART1_transmit(DISPENSECOMPLETE);
+								PORTB &= ~(1<<DDRB0);
 								break;
 							case (STATUS):
-								returnStatus();
+								USART1_transmit(STATUSOK);
+								PORTB &= ~(1<<DDRB);
 								break;
 							default:
-								invalidCommand();
+								USART1_transmit(COMMANDINVALID);
+								PORTB &= ~(1<<DDRB2);
 						}
+						
 			}
-			outstandingRqsts--;
+			outstandingRqsts = 0;
 		}
 	}
 }
 
 ISR(USART1_RX_vect) {
 	msgStatus = USART1_receive(&msgRqst);
-	outstandingRqsts ++;
-	PORTA = (outstandingRqsts << DDRA0);
-}
-
-void dispense(){
-	fullRotation();
-	USART1_transmit(DISPENSECOMPLETE);
-}
-
-void returnStatus(){
-	USART1_transmit(STATUSOK);
-}
-
-void invalidCommand(){
-	USART1_transmit(COMMANDINVALID);
+	outstandingRqsts = 1;
 }
 
 void stepperPortOutput(){

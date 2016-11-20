@@ -13,7 +13,7 @@
 #include <util/atomic.h> // might not be needed
 
 
-#define COMPARE_VAL 500
+#define COMPARE_VAL 50000 //value for stepper motor, should use ~500 for normal cmds
 
 void TIMER1_enable();
 void TIMER1_disable();
