@@ -7,3 +7,9 @@ ATtiny841/ATtiny841.atsln
 ATtiny841/ATtiny841/ATtiny*
 ATtiny841/ATtiny841/Debug/*
 ATtiny841/.vs/*
+
+JTAG324p/JTAG324p.atsln
+JTAG324p/JTAG324p/JTAG*
+JTAG324p/JTAG324p/Debug/*
+JTAG324p/.vs/*
+
