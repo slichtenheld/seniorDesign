@@ -3,6 +3,23 @@
 
 #define MSGLENGTH 3
 
+#define slaveFrameError '#'
+#define slaveDataOverRunError '&'
+#define slaveParityError '!'
+
+#define DISPENSE 'a'
+#define DISPENSECOMPLETE 'b'
+#define STATUS '9'
+#define STATUSOK '1'
+#define STATUSERROR 0
+#define BUSY 'Z'
+
+#define COMMANDINVALID '?'
+
+#define FRAMEERROR -1
+#define DATAOVERRUNERROR -2
+#define PARITYERROR -3
+
 struct message{
 	unsigned char validity;
 	unsigned char address;

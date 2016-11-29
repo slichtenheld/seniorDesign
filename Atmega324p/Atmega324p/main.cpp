@@ -17,8 +17,10 @@
 #include "C:\Users\samuel\Documents\github\seniorDesign\myHeaderFiles\messages.h"
 
 #define OSC_CAL 0x59
-#define BAUD_1 3000                                  
-#define BAUDRATE ((F_CPU)/(BAUD_1*16UL)-1)
+//#define BAUD_1 3000                                  
+//#define BAUDRATE_1 ((F_CPU)/(BAUD_1*16UL)-1)
+
+#define SIMULATETESTING 1
 
 void clock_calibrate(); 
 void restartTransaction();
@@ -40,11 +42,13 @@ unsigned char msgCmd; //uart interrupt will put data here
 int8_t msgCmdStatus;
 int8_t outStandingCmds;
 int8_t waitingForResp; // increment when waiting for response
-bool timeout; // flag for timeouts
+bool timeout0; // flag for timeout0s
+bool timeout1;
 
 unsigned char msgResp; // response from module via usart
 int8_t msgRespStatus;
 int8_t recievedResp; // increment when receive responses
+
 
 int main(void)
 {
@@ -59,8 +63,8 @@ int main(void)
 	UART0_INIT(BAUD_9600, FALSE, 8, NONE, 1, TRUE);
 	
 	// initialize timer
-	TIMER1_init();
-	TIMER1_compareInterruptEnable();
+	TIMER0_init();
+	TIMER0_compareInterruptEnable();
 	
 	// initialize usart
 	USART1_init();
@@ -73,49 +77,57 @@ int main(void)
 	waitingForResp = 0;
 	msgRespStatus = 0;
 	msgCmd = 0;
-	timeout = false;
+	timeout0 = false;
 	
 	while(1){
 		
-		//if(timeout) PORTA = ()
+		//if(timeout0) PORTA = ()
 		
-		if(timeout) { // handle timeout 
+		if(timeout0) { // handle timeout0 
 			restartTransaction();
-			timeout = false; //clear timeout flag
+			timeout0 = false; //clear timeout0 flag
 			//USART1_receiveDisable();
 		}
 		
-		//Simulating incoming commands via uart interrupt
-		//else if (!outStandingCmds && !waitingForResp){ // if no outstanding commands and no outstanding responses
-			//msgCmd = DISPENSE;
-			//outStandingCmds=1;
-		//}
-		else if (m1Full && !outStandingCmds && !waitingForResp) { // handle message from ESP
-			// handle address
-			// m1.address Multi Processor Communication needed
-			// set up communication to correct slave
-			
-			msgCmd = m1.cmd;
-			outStandingCmds=1;
-			rstMsgTracker();
-		}
-		
-		
-		else if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-			
-			if (m1.validity=='!'){
-				USART1_transmit(msgCmd);
-				TIMER1_enable();// set timer interrupt for how long to wait for response
-				waitingForResp=1; // waiting on response
+		#if SIMULATETESTING
+		{
+			//Simulating incoming commands via uart interrupt
+			if (!outStandingCmds && !waitingForResp){ // if no outstanding commands and no outstanding responses
+				m1.address = 'X';
+				m1.cmd = msgCmd++;
+				outStandingCmds=1;
 			}
-	
-			outStandingCmds=0; // command sent
-			
-			
+			if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
+				USART1_transmit(m1.address, ADDRESS_MSG);
+				USART1_transmit(m1.cmd, DATA_MSG);
+				TIMER0_enable();// set timer interrupt for how long to wait for response
+				waitingForResp=1; // waiting on response
+				outStandingCmds=0; // command sent
+			}
 		}
-		
-		else if (recievedResp) { // handle response
-			TIMER1_disable(); 
+		#else 
+		{ // USING ESP
+			if (m1Full && !outStandingCmds && !waitingForResp) { // handle message from ESP
+				// handle address
+				// m1.address Multi Processor Communication needed
+				// set up communication to correct slave
+				msgCmd = m1.cmd;
+				outStandingCmds=1;
+				rstMsgTracker();
+			}
+			if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
+				if (m1.validity=='!'){
+					USART1_transmit(msgCmd);
+					TIMER0_enable();// set timer interrupt for how long to wait for response
+					waitingForResp=1; // waiting on response
+				}
+				outStandingCmds=0; // command sent
+			}
+		}
+		#endif
+		/* received message from slave logic */
+		if (recievedResp) { // handle response
+			TIMER0_disable(); 
 			waitingForResp = 0;
 			if (msgRespStatus < 0){ // local error
 				// retransmit command
@@ -124,10 +136,12 @@ int main(void)
 				clearReceiveBuffer();
 				// set other error output bits
 			}
-			else if ( msgResp == slaveFrameError || msgResp == slaveDataOverRunError || msgResp == slaveFrameError ){ //slave error
-				// retransmit command
-				restartTransaction();
-			}
+			/* COMMENT OUT IF TESTING RANDOM/ALL MSG VALUES!!!!! */
+			//else if ( msgResp == slaveFrameError || msgResp == slaveDataOverRunError || msgResp == slaveFrameError ){ //slave error
+				//// retransmit command
+				//restartTransaction();
+				//PORTA = ~PORTA;
+			//}
 			else {
 				PORTC ^= (1 << DDRC0);
 				//PORTA = msgResp; // for now just echoing response to LEDs
@@ -145,7 +159,12 @@ ISR(USART1_RX_vect) { // interrupt for receive
 // hence, toggle led here itself..
 ISR (TIMER1_COMPA_vect){
     // toggle led here
-	timeout = true;
+	timeout1 = true;
+}
+
+ISR (TIMER0_COMPA_vect){
+	// toggle led here
+	timeout0 = true;
 }
 
 ISR(USART0_RX_vect) {
@@ -182,7 +201,7 @@ void clock_calibrate(void) {
 	OSCCAL = OSC_CAL; // CLK calibration
 }
 
-//// UART1 RX Functions with TIMEOUT
+//// UART1 RX Functions with timeout0
 //int8_t receiveUSART1(unsigned char *message) {
 	//DDRD = (0 << DDRD4); // de-initialize for clockout
 	//uint32_t timer = 0;
@@ -208,7 +227,7 @@ void clock_calibrate(void) {
 	//return errtmp;
 //}
 
-// TIMEOUT IMPLEMENTED
+// timeout0 IMPLEMENTED
 //char uart_getc(void) {
 	//uint16_t timer = 0;
 	//while (!(UCSR0A & (1<<RXC0))) {
