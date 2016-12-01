@@ -35,6 +35,7 @@ void incMsgTracker(){
 	if (tracker >= MSGLENGTH){
 		 tracker = 0;
 		 m1Full = true;
+	//	 push(m1, &f1);
 	}
 }
 
@@ -43,7 +44,7 @@ void rstMsgTracker(){
 	m1Full = false;
 }
 
-void addCharToMsg(unsigned char var){
+void addCharToMsg(volatile unsigned char var){
 	switch(tracker){
 		case 0: m1.validity = var; break;
 		case 1: m1.address = var; break;

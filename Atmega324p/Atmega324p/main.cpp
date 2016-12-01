@@ -15,6 +15,8 @@
 #include "C:\Users\samuel\Documents\github\seniorDesign\myHeaderFiles\usart.h"
 #include "C:\Users\samuel\Documents\github\seniorDesign\myHeaderFiles\timer1.h"
 #include "C:\Users\samuel\Documents\github\seniorDesign\myHeaderFiles\messages.h"
+#include "C:\Users\samuel\Documents\github\seniorDesign\myHeaderFiles\Fifo.h"
+
 
 #define OSC_CAL 0x59
 //#define BAUD_1 3000                                  
@@ -25,36 +27,27 @@
 void clock_calibrate(); 
 void restartTransaction();
 
-// Abel's shitty interrupt vars
-//volatile unsigned char rxByte0;
-//unsigned char rxBuf0[256];
-//volatile unsigned rxIndex0 = 0;
-//volatile unsigned rxStringRdy0 = 0;
-//
-//volatile unsigned char rxByte1;
-//unsigned char * rxBuf1;
-//volatile unsigned rxIndex1 = 0;
-//volatile unsigned rxStringRdy1 = 0;
 
-
-unsigned char msgCmd; //uart interrupt will put data here
+volatile unsigned char msgCmd; //uart interrupt will put data here
 //uint8_t msgID; // value used to keep track of messages
-int8_t msgCmdStatus;
-int8_t outStandingCmds;
-int8_t waitingForResp; // increment when waiting for response
-bool timeout0; // flag for timeout0s
-bool timeout1;
+volatile int8_t msgCmdStatus;
+volatile int8_t outStandingCmds;
+volatile int8_t waitingForResp; // increment when waiting for response
+volatile bool timeout0; // flag for timeout0s
+volatile bool timeout1;
 
-unsigned char msgResp; // response from module via usart
-int8_t msgRespStatus;
-int8_t recievedResp; // increment when receive responses
+volatile unsigned char msgResp; // response from module via usart
+volatile int8_t msgRespStatus;
+volatile int8_t recievedResp; // increment when receive responses
+
+struct fifo f1;
 
 
 int main(void)
 {
 	// initialize test LED ports
-	DDRA = 0xFF; // initialize to test
-	DDRC = (1 << DDRC0);
+	//DDRA = 0xFF; // initialize to test
+	//DDRC = (1 << DDRC0);
 	
 	//calibrate clock
 	clock_calibrate();
@@ -79,12 +72,55 @@ int main(void)
 	msgCmd = 0;
 	timeout0 = false;
 	
+	 //
+	//	bool isEmpty(fifo *f){
+	//	bool isFull(fifo *f){
+	//	message getMsg(fifo *f){
+	//	int pop(fifo *f){
+	//	int push(message m, fifo *f) {
+	//	int getHead(fifo *f){
+	//	int getTail(fifo *f){
+	fifoInit(&f1);
+	
+	struct message msgTemp;
+	msgTemp.validity = '!';
+	msgTemp.address = 100;
+	msgTemp.cmd = DISPENSE;
+	push(msgTemp,&f1);
+	msgTemp.validity = '!';
+	msgTemp.address = 101;
+	msgTemp.cmd = STATUS;
+	push(msgTemp,&f1);
+	msgTemp.validity = '!';
+	msgTemp.address = 102;
+	msgTemp.cmd = STATUS;
+	push(msgTemp,&f1);
+	
+	volatile unsigned char temp;
+	volatile bool booltemp = false;
+	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	temp = msgTemp.address;
+	pop(&f1); // remove msg from FIFO
+	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	temp = msgTemp.address;
+	pop(&f1); // remove msg from FIFO
+	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	temp = msgTemp.address;
+	booltemp = isEmpty(&f1);
+	pop(&f1); // remove msg from FIFO
+	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	temp = msgTemp.address;
+	booltemp = isEmpty(&f1);
+	pop(&f1); // remove msg from FIFO
+	booltemp = isEmpty(&f1);
+	asm volatile("nop");
+	
+	
 	while(1){
-		
-		//if(timeout0) PORTA = ()
-		
+				
 		if(timeout0) { // handle timeout0 
-			restartTransaction();
+			//restartTransaction();
+			waitingForResp = 0;
 			timeout0 = false; //clear timeout0 flag
 			//USART1_receiveDisable();
 		}
@@ -92,56 +128,80 @@ int main(void)
 		#if SIMULATETESTING
 		{
 			//Simulating incoming commands via uart interrupt
-			if (!outStandingCmds && !waitingForResp){ // if no outstanding commands and no outstanding responses
-				m1.address = 'X';
-				m1.cmd = msgCmd++;
-				outStandingCmds=1;
+			if ( !isFull(&f1)){ // if no outstanding commands and no outstanding responses
+				struct message msgTemp;
+				msgTemp.validity = '!';
+				msgTemp.address = 'X';
+				msgTemp.cmd = DISPENSE;
+				push(msgTemp,&f1);
+				msgTemp.validity = '!';
+				msgTemp.address = 'Y';
+				msgTemp.cmd = STATUS;
+				push(msgTemp,&f1);
+				msgTemp.validity = '!';
+				msgTemp.address = 'Z';
+				msgTemp.cmd = STATUS;
+				push(msgTemp,&f1);
 			}
-			if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-				USART1_transmit(m1.address, ADDRESS_MSG);
-				USART1_transmit(m1.cmd, DATA_MSG);
-				TIMER0_enable();// set timer interrupt for how long to wait for response
-				waitingForResp=1; // waiting on response
-				outStandingCmds=0; // command sent
+			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
+				struct message msgTmp = getMsg(&f1); // retrieve earliest msg from FIFO
+				pop(&f1); // remove msg from FIFO
+				//volatile unsigned char temp = 0;
+				//temp = msgTmp.address;
+				//temp = msgTmp.cmd;
+				if (msgTmp.validity == '!'){
+					USART1_transmit(msgTmp.address, ADDRESS_MSG);
+					USART1_transmit(msgTmp.cmd, DATA_MSG);
+					TIMER0_enable();// set timer interrupt for how long to wait for response
+					waitingForResp=1; // waiting on response
+				}
+				//outStandingCmds=0; // command sent // REPLACED BY FIFO
 			}
 		}
 		#else 
 		{ // USING ESP
-			if (m1Full && !outStandingCmds && !waitingForResp) { // handle message from ESP
+			if (!isEmpty(&f1) && !outStandingCmds && !waitingForResp) { // handle message from ESP
 				// handle address
 				// m1.address Multi Processor Communication needed
 				// set up communication to correct slave
-				msgCmd = m1.cmd;
+				//msgCmd = m1.cmd; 
 				outStandingCmds=1;
 				rstMsgTracker();
 			}
 			if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-				if (m1.validity=='!'){
-					USART1_transmit(msgCmd);
+				// pop off message from FIFO
+				struct message tmpMsg;
+				tmpMsg = getMsg(&f1);
+				
+				if (tmpMsg.validity=='!'){
+					USART1_transmit(tmpMsg.address);
+					USART1_transmit(tmpMsg.cmd);
 					TIMER0_enable();// set timer interrupt for how long to wait for response
 					waitingForResp=1; // waiting on response
+					pop(&f1); // pop off message from fifo
 				}
 				outStandingCmds=0; // command sent
 			}
 		}
 		#endif
+		
+		
 		/* received message from slave logic */
 		if (recievedResp) { // handle response
 			TIMER0_disable(); 
 			waitingForResp = 0;
 			if (msgRespStatus < 0){ // local error
 				// retransmit command
-				
 				restartTransaction();
 				clearReceiveBuffer();
 				// set other error output bits
 			}
 			/* COMMENT OUT IF TESTING RANDOM/ALL MSG VALUES!!!!! */
-			//else if ( msgResp == slaveFrameError || msgResp == slaveDataOverRunError || msgResp == slaveFrameError ){ //slave error
-				//// retransmit command
-				//restartTransaction();
-				//PORTA = ~PORTA;
-			//}
+			else if ( msgResp == slaveFrameError || msgResp == slaveDataOverRunError || msgResp == slaveFrameError ){ //slave error
+				// retransmit command
+				restartTransaction();
+				PORTA = ~PORTA;
+			}
 			else {
 				PORTC ^= (1 << DDRC0);
 				//PORTA = msgResp; // for now just echoing response to LEDs
@@ -151,22 +211,6 @@ int main(void)
 	}
 }
 
-ISR(USART1_RX_vect) { // interrupt for receive
-	recievedResp=1;
-	msgRespStatus = USART1_receive(&msgResp);
-}
-// this ISR is fired whenever a match occurs
-// hence, toggle led here itself..
-ISR (TIMER1_COMPA_vect){
-    // toggle led here
-	timeout1 = true;
-}
-
-ISR (TIMER0_COMPA_vect){
-	// toggle led here
-	timeout0 = true;
-}
-
 ISR(USART0_RX_vect) {
 	unsigned char temp = UDR0;
 	if (temp == '!') {
@@ -174,65 +218,29 @@ ISR(USART0_RX_vect) {
 		PORTA = ~PORTA;
 	}
 	addCharToMsg(temp);
-	//rxByte0 = UDR0;
-	//
-	//if(rxByte0 != '\r') {
-		//rxBuf0[rxIndex0++] = rxByte0;
-	//}
-	//else {
-		//rxStringRdy0 = 1;
-		//rxBuf0[rxIndex0++] = '\r';
-		//rxBuf0[rxIndex0] = '\n';
-	//}
-	
+}
+
+ISR(USART1_RX_vect) { // interrupt for receive
+	recievedResp=1;
+	unsigned char temp = 0;
+	msgRespStatus = USART1_receive(&temp); // can't pass directly to msgResp because volatile unsigned char (global var)
+	msgResp = temp;
+}
+
+ISR (TIMER1_COMPA_vect){
+	timeout1 = true;
+}
+
+ISR (TIMER0_COMPA_vect){
+	timeout0 = true;
 }
 
 void restartTransaction(){
-	outStandingCmds=1; //should cause last message to be resent
+	//outStandingCmds=1; //should cause last message to be resent
 	waitingForResp=0; //no longer waiting for response, restarting transaction
 }
-// timer1 overflow
-//ISR(TIMER1_OVF_vect) {
-	 //process the timer1 overflow here
-//}
 
 
 void clock_calibrate(void) {
 	OSCCAL = OSC_CAL; // CLK calibration
 }
-
-//// UART1 RX Functions with timeout0
-//int8_t receiveUSART1(unsigned char *message) {
-	//DDRD = (0 << DDRD4); // de-initialize for clockout
-	//uint32_t timer = 0;
-	//uint8_t errtmp = 0;
-	//while( !(UCSR1A & (1 << RXC1)) );// {
-		////timer++;
-		////if ( timer >= 512000 ){
-			////errtmp = -1;
-			////break;
-		////}
-	////}
-	//// check for frame error
-	//if (UCSR1A & (1 << FE1)) errtmp = -2;
-	//
-	//// check for Data OverRun Error
-	//else if (UCSR1A & (1 << DOR1)) errtmp = -3;
-	//
-	//// check for Parity Error
-	//else if (UCSR1A & (1 << UPE1)) errtmp = -4;
-	//
-	//*message = UDR1;
-	//
-	//return errtmp;
-//}
-
-// timeout0 IMPLEMENTED
-//char uart_getc(void) {
-	//uint16_t timer = 0;
-	//while (!(UCSR0A & (1<<RXC0))) {
-		//timer++;
-		//if(timer >= 16000) return 0;
-	//} // Wait for byte to arrive
-	//return UDR0;
-//}

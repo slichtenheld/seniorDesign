@@ -60,8 +60,7 @@ int8_t USART1_receive(unsigned char *message) {
 
 // reset receive buffer, for some reason if multiple missed reads occur timeout no longer functions (has to do with RXC1 bit)
 void clearReceiveBuffer(void) {
-	unsigned char dummy;
-	while ( UCSR1A & (1<<RXC1) ) dummy = UDR1;
+	while ( UCSR1A & (1<<RXC1) ) if(UDR1);
 	USART1_receiveDisable();
 	USART1_receiveEnable();
 };

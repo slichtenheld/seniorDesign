@@ -19,15 +19,15 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING
   7 .debug_abbrev 000008d9  00000000  00000000  0000135a  2**0
                   CONTENTS, READONLY, DEBUGGING
-  8 .debug_line   000007f2  00000000  00000000  00001c33  2**0
+  8 .debug_line   000007f8  00000000  00000000  00001c33  2**0
                   CONTENTS, READONLY, DEBUGGING
-  9 .debug_frame  0000027c  00000000  00000000  00002428  2**2
+  9 .debug_frame  0000028c  00000000  00000000  0000242c  2**2
                   CONTENTS, READONLY, DEBUGGING
- 10 .debug_str    000009b0  00000000  00000000  000026a4  2**0
+ 10 .debug_str    000009b0  00000000  00000000  000026b8  2**0
                   CONTENTS, READONLY, DEBUGGING
- 11 .debug_loc    0000029c  00000000  00000000  00003054  2**0
+ 11 .debug_loc    000002ef  00000000  00000000  00003068  2**0
                   CONTENTS, READONLY, DEBUGGING
- 12 .debug_ranges 00000100  00000000  00000000  000032f0  2**0
+ 12 .debug_ranges 00000100  00000000  00000000  00003357  2**0
                   CONTENTS, READONLY, DEBUGGING
 
 Disassembly of section .text:
@@ -106,12 +106,12 @@ Disassembly of section .text:
   b6:	0c 94 00 00 	jmp	0	; 0x0 <__vectors>
 
 000000ba <_Z14USART1_receivePh>:
-	switch(tracker){
 		case 0: m1.validity = var; break;
 		case 1: m1.address = var; break;
 		case 2: m1.cmd = var; break; 
 	}
 	incMsgTracker();
+} 
   ba:	fc 01       	movw	r30, r24
   bc:	80 91 c8 00 	lds	r24, 0x00C8	; 0x8000c8 <__TEXT_REGION_LENGTH__+0x7e00c8>
   c0:	84 fd       	sbrc	r24, 4
