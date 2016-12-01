@@ -34,8 +34,10 @@ void incMsgTracker(){
 	tracker++;
 	if (tracker >= MSGLENGTH){
 		 tracker = 0;
-		 m1Full = true;
-		 push(m1, &f1); // added this line of code 
+		 if (m1.validity=='!') {
+			m1Full = true;
+		 }
+		else m1Full = false;
 	}
 }
 

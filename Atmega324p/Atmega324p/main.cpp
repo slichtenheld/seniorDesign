@@ -18,7 +18,7 @@
 #include "C:\Users\samuel\Documents\github\seniorDesign\myHeaderFiles\Fifo.h"
 
 
-#define OSC_CAL 0x59
+#define OSC_CAL 0x92
 //#define BAUD_1 3000                                  
 //#define BAUDRATE_1 ((F_CPU)/(BAUD_1*16UL)-1)
 
@@ -91,9 +91,14 @@ int main(void)
 			if ( !isFull(&f1)){ // if no outstanding commands and no outstanding responses
 				struct message msgTemp;
 				msgTemp.validity = '!';
+				msgTemp.address = 'X';
+				msgTemp.cmd = DISPENSE;
+				push(msgTemp,&f1);
+				msgTemp.validity = '!';
 				msgTemp.address = 'Y';
 				msgTemp.cmd = DISPENSE;
 				push(msgTemp,&f1);
+				_delay_ms(10000);
 				
 			}
 			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
@@ -118,28 +123,56 @@ int main(void)
 		}
 		#else 
 		{ // USING ESP
-			if (!isEmpty(&f1) && !outStandingCmds && !waitingForResp) { // handle message from ESP
-				// handle address
-				// m1.address Multi Processor Communication needed
-				// set up communication to correct slave
-				//msgCmd = m1.cmd; 
-				outStandingCmds=1;
+			if (m1Full){ // if m1full then put onto FIFO
+				push(m1,&f1);
 				rstMsgTracker();
+				volatile unsigned char temp1 = 0;
+				temp1 = m1.validity;
+				temp1 = m1.address;
+				temp1 = m1.cmd;
+				temp1 = 255;
 			}
-			if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-				// pop off message from FIFO
-				struct message tmpMsg;
-				tmpMsg = getMsg(&f1);
-				
-				if (tmpMsg.validity=='!'){
-					USART1_transmit(tmpMsg.address);
-					USART1_transmit(tmpMsg.cmd);
-					TIMER0_enable();// set timer interrupt for how long to wait for response
-					waitingForResp=1; // waiting on response
-					pop(&f1); // pop off message from fifo
+			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
+				outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
+				if (timeout0Counter>=30){ // after tried # times, remove from FIFO
+					pop(&f1); // remove msg from FIFO
+					// send response to esp
+					transmitUART0(outstandingMsg.address);
+					transmitUART0(outstandingMsg.cmd);
+					transmitUART0('0'); // not actually zero, verified with Abel
+					transmitUART0('#');
+					timeout0Counter = 0; // also set to zero if received message
 				}
-				outStandingCmds=0; // command sent
+				else {
+					USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
+					USART1_transmit('a', DATA_MSG);
+					TIMER0_enable();// set timer interrupt for how long to wait for response
+					waitingForResp = 1; // waiting on response
+				}
+				//outStandingCmds=0; // command sent // REPLACED BY FIFO
 			}
+			//if (!isEmpty(&f1) && !outStandingCmds && !waitingForResp) { // handle message from ESP
+				//// handle address
+				//// m1.address Multi Processor Communication needed
+				//// set up communication to correct slave
+				////msgCmd = m1.cmd; 
+				//outStandingCmds=1;
+				//rstMsgTracker();
+			//}
+			//if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
+				//// pop off message from FIFO
+				//struct message tmpMsg;
+				//tmpMsg = getMsg(&f1);
+				//
+				//if (tmpMsg.validity=='!'){
+					//USART1_transmit(tmpMsg.address);
+					//USART1_transmit(tmpMsg.cmd);
+					//TIMER0_enable();// set timer interrupt for how long to wait for response
+					//waitingForResp=1; // waiting on response
+					//pop(&f1); // pop off message from fifo
+				//}
+				//outStandingCmds=0; // command sent
+			//}
 		}
 		#endif
 		

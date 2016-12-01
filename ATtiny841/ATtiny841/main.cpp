@@ -36,7 +36,7 @@ volatile int8_t msgStatus;	  // receive status
 volatile bool mode; 
 #define MPCM_MODE 1// Multi-processor Communication mode - only stores data in receive buffer if 9th bit is set (address word)
 #define DATA_MODE 0
-volatile const unsigned char slaveAddr = 'Y'; // use X, Y, and Z
+volatile const unsigned char slaveAddr = 'Z'; // use X, Y, and Z
 
 int main(void)
 {
