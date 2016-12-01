@@ -11,7 +11,7 @@
     //unsigned char cmd;
 //};
 
-#define FifoSize 2
+#define FifoSize 10
 struct fifo{
 	struct message m[FifoSize];
 	bool empty;
@@ -22,9 +22,9 @@ struct fifo{
 
 void fifoInit(fifo *f){
 	for(uint8_t i = 0; i < FifoSize; i++){
-		f-> m[i].address = '*';
-		f-> m[i].cmd = '*';
-		f-> m[i].validity = '*';
+		f-> m[i].address = 0;
+		f-> m[i].cmd = 0;
+		f-> m[i].validity = 0;
 	}
 	f->empty = true;
 	f->full = false;

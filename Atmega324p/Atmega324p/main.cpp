@@ -82,38 +82,38 @@ int main(void)
 	//	int getTail(fifo *f){
 	fifoInit(&f1);
 	
-	struct message msgTemp;
-	msgTemp.validity = '!';
-	msgTemp.address = 100;
-	msgTemp.cmd = DISPENSE;
-	push(msgTemp,&f1);
-	msgTemp.validity = '!';
-	msgTemp.address = 101;
-	msgTemp.cmd = STATUS;
-	push(msgTemp,&f1);
-	msgTemp.validity = '!';
-	msgTemp.address = 102;
-	msgTemp.cmd = STATUS;
-	push(msgTemp,&f1);
-	
-	volatile unsigned char temp;
-	volatile bool booltemp = false;
-	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	temp = msgTemp.address;
-	pop(&f1); // remove msg from FIFO
-	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	temp = msgTemp.address;
-	pop(&f1); // remove msg from FIFO
-	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	temp = msgTemp.address;
-	booltemp = isEmpty(&f1);
-	pop(&f1); // remove msg from FIFO
-	msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	temp = msgTemp.address;
-	booltemp = isEmpty(&f1);
-	pop(&f1); // remove msg from FIFO
-	booltemp = isEmpty(&f1);
-	asm volatile("nop");
+	//struct message msgTemp;
+	//msgTemp.validity = '!';
+	//msgTemp.address = 100;
+	//msgTemp.cmd = DISPENSE;
+	//push(msgTemp,&f1);
+	//msgTemp.validity = '!';
+	//msgTemp.address = 101;
+	//msgTemp.cmd = STATUS;
+	//push(msgTemp,&f1);
+	//msgTemp.validity = '!';
+	//msgTemp.address = 102;
+	//msgTemp.cmd = STATUS;
+	//push(msgTemp,&f1);
+	//
+	//volatile unsigned char temp;
+	//volatile bool booltemp = false;
+	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	//temp = msgTemp.address;
+	//pop(&f1); // remove msg from FIFO
+	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	//temp = msgTemp.address;
+	//pop(&f1); // remove msg from FIFO
+	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	//temp = msgTemp.address;
+	//booltemp = isEmpty(&f1);
+	//pop(&f1); // remove msg from FIFO
+	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
+	//temp = msgTemp.address;
+	//booltemp = isEmpty(&f1);
+	//pop(&f1); // remove msg from FIFO
+	//booltemp = isEmpty(&f1);
+	//asm volatile("nop");
 	
 	
 	while(1){
@@ -131,17 +131,17 @@ int main(void)
 			if ( !isFull(&f1)){ // if no outstanding commands and no outstanding responses
 				struct message msgTemp;
 				msgTemp.validity = '!';
-				msgTemp.address = 'X';
-				msgTemp.cmd = DISPENSE;
+				msgTemp.address = 0xFF;
+				msgTemp.cmd = 0xFF;
 				push(msgTemp,&f1);
 				msgTemp.validity = '!';
-				msgTemp.address = 'Y';
-				msgTemp.cmd = STATUS;
+				msgTemp.address = 0;
+				msgTemp.cmd = 0;
 				push(msgTemp,&f1);
-				msgTemp.validity = '!';
-				msgTemp.address = 'Z';
-				msgTemp.cmd = STATUS;
-				push(msgTemp,&f1);
+				//msgTemp.validity = '!';
+				//msgTemp.address = 'Z';
+				//msgTemp.cmd = STATUS;
+				//push(msgTemp,&f1);
 			}
 			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
 				struct message msgTmp = getMsg(&f1); // retrieve earliest msg from FIFO
