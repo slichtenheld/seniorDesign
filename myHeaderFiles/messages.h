@@ -35,7 +35,7 @@ void incMsgTracker(){
 	if (tracker >= MSGLENGTH){
 		 tracker = 0;
 		 m1Full = true;
-	//	 push(m1, &f1);
+		 push(m1, &f1); // added this line of code 
 	}
 }
 

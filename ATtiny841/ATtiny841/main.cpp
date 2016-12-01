@@ -36,7 +36,7 @@ volatile int8_t msgStatus;	  // receive status
 volatile bool mode; 
 #define MPCM_MODE 1// Multi-processor Communication mode - only stores data in receive buffer if 9th bit is set (address word)
 #define DATA_MODE 0
-volatile const unsigned char slaveAddr = 'X'; // use X, Y, and Z
+volatile const unsigned char slaveAddr = 'Y'; // use X, Y, and Z
 
 int main(void)
 {
@@ -75,33 +75,32 @@ int main(void)
 				case (FRAMEERROR):
 					//clearReceiveBuffer();
 					//PORTB &= ~(1<<DDRB2);
-					USART1_transmit(slaveFrameError, DATA_MSG);
+					//USART1_transmit(slaveFrameError, DATA_MSG);
 					break;
 				case (DATAOVERRUNERROR):
 					//clearReceiveBuffer();
 					//PORTB &= ~(1<<DDRB1);
-					USART1_transmit(slaveDataOverRunError, DATA_MSG);
+					//USART1_transmit(slaveDataOverRunError, DATA_MSG);
 					break;
 				case (PARITYERROR):
 					//clearReceiveBuffer();
 					//PORTB &= ~(1<<DDRB0);
-					USART1_transmit(slaveParityError, DATA_MSG);
+					//USART1_transmit(slaveParityError, DATA_MSG);
 					break;
 				default: // no receive error
 						//PORTB = 0b111;
 						//PORTB = 0;
 						switch(msgRqst){
 							case (DISPENSE):
+								USART1_transmit('1', DATA_MSG);
 								fullRotation();
-								USART1_transmit(DISPENSECOMPLETE, DATA_MSG);
+								
 								//PORTB &= ~(1<<DDRB0);
 								break;
 							case (STATUS):
-								USART1_transmit(STATUSOK, DATA_MSG);
+								USART1_transmit('1', DATA_MSG);
 								//PORTB &= ~(1<<DDRB1);
 								break;
-							default:
-								USART1_transmit(COMMANDINVALID , DATA_MSG);
 						}
 			}
 			outstandingRqsts = 0;

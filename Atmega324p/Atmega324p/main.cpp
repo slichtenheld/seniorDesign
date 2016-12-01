@@ -31,9 +31,12 @@ void restartTransaction();
 volatile unsigned char msgCmd; //uart interrupt will put data here
 //uint8_t msgID; // value used to keep track of messages
 volatile int8_t msgCmdStatus;
-volatile int8_t outStandingCmds;
+//volatile int8_t outStandingCmds;
 volatile int8_t waitingForResp; // increment when waiting for response
+
 volatile bool timeout0; // flag for timeout0s
+volatile uint8_t timeout0Counter;
+
 volatile bool timeout1;
 
 volatile unsigned char msgResp; // response from module via usart
@@ -41,13 +44,10 @@ volatile int8_t msgRespStatus;
 volatile int8_t recievedResp; // increment when receive responses
 
 struct fifo f1;
-
+struct message outstandingMsg;
 
 int main(void)
 {
-	// initialize test LED ports
-	//DDRA = 0xFF; // initialize to test
-	//DDRC = (1 << DDRC0);
 	
 	//calibrate clock
 	clock_calibrate();
@@ -66,60 +66,20 @@ int main(void)
 	sei();
 	
 	// Global Variables
-	outStandingCmds = 0;
+	//outStandingCmds = 0;
 	waitingForResp = 0;
 	msgRespStatus = 0;
 	msgCmd = 0;
 	timeout0 = false;
+	timeout0Counter = 0;
 	
-	 //
-	//	bool isEmpty(fifo *f){
-	//	bool isFull(fifo *f){
-	//	message getMsg(fifo *f){
-	//	int pop(fifo *f){
-	//	int push(message m, fifo *f) {
-	//	int getHead(fifo *f){
-	//	int getTail(fifo *f){
 	fifoInit(&f1);
-	
-	//struct message msgTemp;
-	//msgTemp.validity = '!';
-	//msgTemp.address = 100;
-	//msgTemp.cmd = DISPENSE;
-	//push(msgTemp,&f1);
-	//msgTemp.validity = '!';
-	//msgTemp.address = 101;
-	//msgTemp.cmd = STATUS;
-	//push(msgTemp,&f1);
-	//msgTemp.validity = '!';
-	//msgTemp.address = 102;
-	//msgTemp.cmd = STATUS;
-	//push(msgTemp,&f1);
-	//
-	//volatile unsigned char temp;
-	//volatile bool booltemp = false;
-	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	//temp = msgTemp.address;
-	//pop(&f1); // remove msg from FIFO
-	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	//temp = msgTemp.address;
-	//pop(&f1); // remove msg from FIFO
-	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	//temp = msgTemp.address;
-	//booltemp = isEmpty(&f1);
-	//pop(&f1); // remove msg from FIFO
-	//msgTemp = getMsg(&f1); // retrieve earliest msg from FIFO
-	//temp = msgTemp.address;
-	//booltemp = isEmpty(&f1);
-	//pop(&f1); // remove msg from FIFO
-	//booltemp = isEmpty(&f1);
-	//asm volatile("nop");
-	
 	
 	while(1){
 				
 		if(timeout0) { // handle timeout0 
 			//restartTransaction();
+			timeout0Counter++;
 			waitingForResp = 0;
 			timeout0 = false; //clear timeout0 flag
 			//USART1_receiveDisable();
@@ -131,27 +91,25 @@ int main(void)
 			if ( !isFull(&f1)){ // if no outstanding commands and no outstanding responses
 				struct message msgTemp;
 				msgTemp.validity = '!';
-				msgTemp.address = 0xFF;
-				msgTemp.cmd = 0xFF;
+				msgTemp.address = 'Y';
+				msgTemp.cmd = DISPENSE;
 				push(msgTemp,&f1);
-				msgTemp.validity = '!';
-				msgTemp.address = 0;
-				msgTemp.cmd = 0;
-				push(msgTemp,&f1);
-				//msgTemp.validity = '!';
-				//msgTemp.address = 'Z';
-				//msgTemp.cmd = STATUS;
-				//push(msgTemp,&f1);
+				
 			}
 			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-				struct message msgTmp = getMsg(&f1); // retrieve earliest msg from FIFO
-				pop(&f1); // remove msg from FIFO
-				//volatile unsigned char temp = 0;
-				//temp = msgTmp.address;
-				//temp = msgTmp.cmd;
-				if (msgTmp.validity == '!'){
-					USART1_transmit(msgTmp.address, ADDRESS_MSG);
-					USART1_transmit(msgTmp.cmd, DATA_MSG);
+				outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
+				if (timeout0Counter>=3){ // after tried # times, remove from FIFO
+					pop(&f1); // remove msg from FIFO
+					// send response to esp
+					transmitUART0(outstandingMsg.address);
+					transmitUART0(outstandingMsg.cmd);
+					transmitUART0('0'); // not actually zero, verified with Abel
+					transmitUART0('#');
+					timeout0Counter = 0; // also set to zero if received message
+				}
+				else if (outstandingMsg.validity == '!'){
+					USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
+					USART1_transmit(outstandingMsg.cmd, DATA_MSG);
 					TIMER0_enable();// set timer interrupt for how long to wait for response
 					waitingForResp=1; // waiting on response
 				}
@@ -190,23 +148,28 @@ int main(void)
 		if (recievedResp) { // handle response
 			TIMER0_disable(); 
 			waitingForResp = 0;
+			recievedResp=0; //handled response
+			
 			if (msgRespStatus < 0){ // local error
 				// retransmit command
 				restartTransaction();
 				clearReceiveBuffer();
 				// set other error output bits
 			}
-			/* COMMENT OUT IF TESTING RANDOM/ALL MSG VALUES!!!!! */
-			else if ( msgResp == slaveFrameError || msgResp == slaveDataOverRunError || msgResp == slaveFrameError ){ //slave error
-				// retransmit command
-				restartTransaction();
-				PORTA = ~PORTA;
+			///* COMMENT OUT IF TESTING RANDOM/ALL MSG VALUES!!!!! */
+			//else if ( msgResp == slaveFrameError || msgResp == slaveDataOverRunError || msgResp == slaveFrameError ){ //slave error
+				//// retransmit command
+				//restartTransaction();
+				//PORTA = ~PORTA;
+			//}
+			else { // if receive successful!
+				timeout0Counter = 0;
+				transmitUART0(outstandingMsg.address);
+				transmitUART0(outstandingMsg.cmd);
+				transmitUART0(msgResp); // not actually zero, verified with Abel, MAKE SURE MSG RESP IS SENDING '1'
+				transmitUART0('#');
 			}
-			else {
-				PORTC ^= (1 << DDRC0);
-				//PORTA = msgResp; // for now just echoing response to LEDs
-			}
-			recievedResp=0; //handled response
+			
 		}
 	}
 }
