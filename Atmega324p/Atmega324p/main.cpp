@@ -22,7 +22,7 @@
 //#define BAUD_1 3000                                  
 //#define BAUDRATE_1 ((F_CPU)/(BAUD_1*16UL)-1)
 
-#define SIMULATETESTING 0
+#define SIMULATETESTING 1
 
 void clock_calibrate(); 
 void restartTransaction();
@@ -46,7 +46,9 @@ volatile int8_t recievedResp; // increment when receive responses
 struct fifo f1;
 struct message outstandingMsg;
 
-volatile unsigned char debuggingTemp;
+// *** DEBUGGING *** //
+volatile unsigned char debuggingTemp1, debuggingTemp2, debuggingTemp3;
+volatile uint16_t debuggingCounter; 
 
 int main(void)
 {
@@ -77,8 +79,25 @@ int main(void)
 	
 	fifoInit(&f1);
 	
-	while(1){
-				
+	// *** DEBUGGING *** //
+	#if SIMULATETESTING
+		debuggingTemp1 =0 ;
+		debuggingTemp2=0;
+		debuggingTemp3=0;
+		debuggingCounter=0;
+		struct message msgTemp;
+		msgTemp.validity = '!';
+		msgTemp.address = 'X';
+		msgTemp.cmd = DISPENSE;
+		push(msgTemp,&f1);
+		msgTemp.validity = '!';
+		msgTemp.address = 'Y';
+		msgTemp.cmd = DISPENSE;
+		push(msgTemp,&f1);
+	#endif
+	/***** END DEBUGGING INITIALIZATION LOGIC *****/
+	
+	while(1){	
 		if(timeout0) { // handle timeout0 
 			//restartTransaction();
 			timeout0Counter++;
@@ -89,43 +108,25 @@ int main(void)
 		
 		#if SIMULATETESTING
 		{
+			debuggingCounter++;
 			//Simulating incoming commands via uart interrupt
-			if ( !isFull(&f1)){ // if no outstanding commands and no outstanding responses
-				struct message msgTemp;
-				msgTemp.validity = '!';
-				msgTemp.address = 'X';
-				msgTemp.cmd = DISPENSE;
-				push(msgTemp,&f1);
-				msgTemp.validity = '!';
-				msgTemp.address = 'Y';
-				msgTemp.cmd = DISPENSE;
-				push(msgTemp,&f1);
-				msgTemp.validity = '!';
-				msgTemp.address = 'Z';
-				msgTemp.cmd = DISPENSE;
-				push(msgTemp,&f1);
-				_delay_ms(10000);
-				
-			}
-			//if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-				//outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
-				//if (timeout0Counter>=3){ // after tried # times, remove from FIFO
-					//pop(&f1); // remove msg from FIFO
-					//// send response to esp
-					//transmitUART0(outstandingMsg.address);
-					//transmitUART0(outstandingMsg.cmd);
-					//transmitUART0('0'); // not actually zero, verified with Abel
-					//transmitUART0('#');
-					//timeout0Counter = 0; // also set to zero if received message
-				//}
-				//else if (outstandingMsg.validity == '!'){
-					//USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
-					//USART1_transmit(outstandingMsg.cmd, DATA_MSG);
-					//TIMER0_enable();// set timer interrupt for how long to wait for response
-					//waitingForResp=1; // waiting on response
-				//}
-				////outStandingCmds=0; // command sent // REPLACED BY FIFO
+			//if ( isEmpty(&f1) && debuggingCounter > 65000){ // if no outstanding commands and no outstanding responses
+				//struct message msgTemp;
+				//msgTemp.validity = '!';
+				//msgTemp.address = 'X';
+				//msgTemp.cmd = DISPENSE;
+				//push(msgTemp,&f1);
+				//msgTemp.validity = '!';
+				//msgTemp.address = 'Y';
+				//msgTemp.cmd = DISPENSE;
+				//push(msgTemp,&f1);
+				//msgTemp.validity = '!';
+				//msgTemp.address = 'Z';
+				//msgTemp.cmd = DISPENSE;
+				//push(msgTemp,&f1);
+				//debuggingCounter = 0;				
 			//}
+
 		}
 		#else 
 		{ // USING ESP
@@ -133,10 +134,10 @@ int main(void)
 				push(m1,&f1);
 				rstMsgTracker();
 				volatile unsigned char temp1 = 0;
-				temp1 = m1.validity;
-				temp1 = m1.address;
-				temp1 = m1.cmd;
-				temp1 = 255;
+				debuggingTemp1 = m1.validity;
+				debuggingTemp2 = m1.address;
+				debuggingTemp3 = m1.cmd;
+				asm volatile("nop");
 			}
 		}
 		#endif
@@ -144,7 +145,7 @@ int main(void)
 				outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
 				
 				// **** IF TIMEOUT FROM SLAVE ***** //
-				if (timeout0Counter>=30){ // after tried # times, remove from FIFO
+				if (timeout0Counter>=3){ // after tried # times, remove from FIFO
 					pop(&f1); // remove msg from FIFO
 					// send response to esp
 					transmitUART0(outstandingMsg.address);
@@ -157,10 +158,10 @@ int main(void)
 				else {
 					
 					/******* CHECK MESSAGE WITH DEBUGGER *********/
-					debuggingTemp = outstandingMsg.validity;
-					debuggingTemp = outstandingMsg.address;
-					debuggingTemp = outstandingMsg.cmd;
-					
+					debuggingTemp1 = outstandingMsg.validity;
+					debuggingTemp2 = outstandingMsg.address;
+					debuggingTemp3 = outstandingMsg.cmd;
+					asm volatile ("nop");
 					/*********************************************/
 					USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
 					USART1_transmit(outstandingMsg.cmd, DATA_MSG);
@@ -169,51 +170,23 @@ int main(void)
 				}
 				//outStandingCmds=0; // command sent // REPLACED BY FIFO
 			}
-			//if (!isEmpty(&f1) && !outStandingCmds && !waitingForResp) { // handle message from ESP
-				//// handle address
-				//// m1.address Multi Processor Communication needed
-				//// set up communication to correct slave
-				////msgCmd = m1.cmd; 
-				//outStandingCmds=1;
-				//rstMsgTracker();
-			//}
-			//if (outStandingCmds && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-				//// pop off message from FIFO
-				//struct message tmpMsg;
-				//tmpMsg = getMsg(&f1);
-				//
-				//if (tmpMsg.validity=='!'){
-					//USART1_transmit(tmpMsg.address);
-					//USART1_transmit(tmpMsg.cmd);
-					//TIMER0_enable();// set timer interrupt for how long to wait for response
-					//waitingForResp=1; // waiting on response
-					//pop(&f1); // pop off message from fifo
-				//}
-				//outStandingCmds=0; // command sent
-			//}
-
-		
 		
 		/* received message from slave logic */
 		if (recievedResp) { // handle response
 			TIMER0_disable(); 
 			waitingForResp = 0;
 			recievedResp=0; //handled response
-			
+			//timeout0Counter = 0;
 			if (msgRespStatus < 0){ // local error
 				// retransmit command
 				restartTransaction();
 				clearReceiveBuffer();
 				// set other error output bits
 			}
-			///* COMMENT OUT IF TESTING RANDOM/ALL MSG VALUES!!!!! */
-			//else if ( msgResp == slaveFrameError || msgResp == slaveDataOverRunError || msgResp == slaveFrameError ){ //slave error
-				//// retransmit command
-				//restartTransaction();
-				//PORTA = ~PORTA;
-			//}
-			else { // if receive successful!
-				timeout0Counter = 0;
+
+			else 
+			{ // if receive successful!
+				pop(&f1); // remove msg from FIFO, message handled
 				transmitUART0(outstandingMsg.address);
 				transmitUART0(outstandingMsg.cmd);
 				transmitUART0(msgResp); // not actually zero, verified with Abel, MAKE SURE MSG RESP IS SENDING '1'
