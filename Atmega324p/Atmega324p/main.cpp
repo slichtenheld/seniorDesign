@@ -101,25 +101,25 @@ int main(void)
 				_delay_ms(10000);
 				
 			}
-			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
-				outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
-				if (timeout0Counter>=3){ // after tried # times, remove from FIFO
-					pop(&f1); // remove msg from FIFO
-					// send response to esp
-					transmitUART0(outstandingMsg.address);
-					transmitUART0(outstandingMsg.cmd);
-					transmitUART0('0'); // not actually zero, verified with Abel
-					transmitUART0('#');
-					timeout0Counter = 0; // also set to zero if received message
-				}
-				else if (outstandingMsg.validity == '!'){
-					USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
-					USART1_transmit(outstandingMsg.cmd, DATA_MSG);
-					TIMER0_enable();// set timer interrupt for how long to wait for response
-					waitingForResp=1; // waiting on response
-				}
-				//outStandingCmds=0; // command sent // REPLACED BY FIFO
-			}
+			//if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
+				//outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
+				//if (timeout0Counter>=3){ // after tried # times, remove from FIFO
+					//pop(&f1); // remove msg from FIFO
+					//// send response to esp
+					//transmitUART0(outstandingMsg.address);
+					//transmitUART0(outstandingMsg.cmd);
+					//transmitUART0('0'); // not actually zero, verified with Abel
+					//transmitUART0('#');
+					//timeout0Counter = 0; // also set to zero if received message
+				//}
+				//else if (outstandingMsg.validity == '!'){
+					//USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
+					//USART1_transmit(outstandingMsg.cmd, DATA_MSG);
+					//TIMER0_enable();// set timer interrupt for how long to wait for response
+					//waitingForResp=1; // waiting on response
+				//}
+				////outStandingCmds=0; // command sent // REPLACED BY FIFO
+			//}
 		}
 		#else 
 		{ // USING ESP
@@ -132,6 +132,8 @@ int main(void)
 				temp1 = m1.cmd;
 				temp1 = 255;
 			}
+		}
+		#endif
 			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
 				outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
 				if (timeout0Counter>=30){ // after tried # times, remove from FIFO
@@ -173,8 +175,7 @@ int main(void)
 				//}
 				//outStandingCmds=0; // command sent
 			//}
-		}
-		#endif
+
 		
 		
 		/* received message from slave logic */
