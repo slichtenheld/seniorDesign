@@ -22,7 +22,7 @@
 //#define BAUD_1 3000                                  
 //#define BAUDRATE_1 ((F_CPU)/(BAUD_1*16UL)-1)
 
-#define SIMULATETESTING 1
+#define SIMULATETESTING 0
 
 void clock_calibrate(); 
 void restartTransaction();
@@ -45,6 +45,8 @@ volatile int8_t recievedResp; // increment when receive responses
 
 struct fifo f1;
 struct message outstandingMsg;
+
+volatile unsigned char debuggingTemp;
 
 int main(void)
 {
@@ -98,6 +100,10 @@ int main(void)
 				msgTemp.address = 'Y';
 				msgTemp.cmd = DISPENSE;
 				push(msgTemp,&f1);
+				msgTemp.validity = '!';
+				msgTemp.address = 'Z';
+				msgTemp.cmd = DISPENSE;
+				push(msgTemp,&f1);
 				_delay_ms(10000);
 				
 			}
@@ -136,6 +142,8 @@ int main(void)
 		#endif
 			if (!isEmpty(&f1) && !waitingForResp) { // if there is an outstanding command and not waiting on a response
 				outstandingMsg = getMsg(&f1); // retrieve earliest msg from FIFO
+				
+				// **** IF TIMEOUT FROM SLAVE ***** //
 				if (timeout0Counter>=30){ // after tried # times, remove from FIFO
 					pop(&f1); // remove msg from FIFO
 					// send response to esp
@@ -145,9 +153,17 @@ int main(void)
 					transmitUART0('#');
 					timeout0Counter = 0; // also set to zero if received message
 				}
+				
 				else {
+					
+					/******* CHECK MESSAGE WITH DEBUGGER *********/
+					debuggingTemp = outstandingMsg.validity;
+					debuggingTemp = outstandingMsg.address;
+					debuggingTemp = outstandingMsg.cmd;
+					
+					/*********************************************/
 					USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
-					USART1_transmit('a', DATA_MSG);
+					USART1_transmit(outstandingMsg.cmd, DATA_MSG);
 					TIMER0_enable();// set timer interrupt for how long to wait for response
 					waitingForResp = 1; // waiting on response
 				}
@@ -212,7 +228,7 @@ ISR(USART0_RX_vect) {
 	unsigned char temp = UDR0;
 	if (temp == '!') {
 		rstMsgTracker();
-		PORTA = ~PORTA;
+		//PORTA = ~PORTA;
 	}
 	addCharToMsg(temp);
 }
