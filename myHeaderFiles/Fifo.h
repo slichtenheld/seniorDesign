@@ -20,7 +20,7 @@ struct fifo{
 	uint8_t tail ;
 };
 
-void fifoInit(fifo *f){
+void fifoInit(struct fifo *f){
 	for(uint8_t i = 0; i < FifoSize; i++){
 		f-> m[i].address = 0;
 		f-> m[i].cmd = 0;
@@ -31,16 +31,16 @@ void fifoInit(fifo *f){
 	f->head = 0;
 	f->tail = 0;
 }
-bool isEmpty(fifo *f){
+bool isEmpty(struct fifo *f){
 	return f->empty;
 }
-bool isFull(fifo *f){
+bool isFull(struct fifo *f){
 	return f->full;
 }
-message getMsg(fifo *f){
+struct message getMsg(struct fifo *f){
 	return f->m[f->tail];
 }
-int pop(fifo *f){
+int pop(struct fifo *f){
 	if(f->empty) return -1;
 
 	f->full = false; // no longer full
@@ -53,7 +53,7 @@ int pop(fifo *f){
 	}
 	return 0;
 }
-int push(message m, fifo *f) {
+int push(struct message m, struct fifo *f) {
 	if (f->full) return -1; //error couldn't store message
 
 	f->empty = false; // no longer empty
@@ -69,10 +69,10 @@ int push(message m, fifo *f) {
 	}
 	return 0; // no error
 }
-int getHead(fifo *f){
+int getHead(struct fifo *f){
 	return f->head;
 }
-int getTail(fifo *f){
+int getTail(struct fifo *f){
 	return f->tail;
 }
 

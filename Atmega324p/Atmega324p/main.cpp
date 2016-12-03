@@ -25,7 +25,7 @@
 #define SIMULATETESTING 1
 
 void clock_calibrate(); 
-void restartTransaction();
+void restartTransaction(); 
 
 
 volatile unsigned char msgCmd; //uart interrupt will put data here
@@ -47,7 +47,7 @@ struct fifo f1;
 struct message outstandingMsg;
 
 // *** DEBUGGING *** //
-volatile unsigned char debuggingTemp1, debuggingTemp2, debuggingTemp3;
+volatile unsigned char debuggingTemp1, debuggingTemp2, debuggingTemp3, debuggingTempVALID, debuggingTempADDR, debuggingTempCMD;
 volatile uint16_t debuggingCounter; 
 
 int main(void)
@@ -87,17 +87,18 @@ int main(void)
 		debuggingCounter=0;
 		struct message msgTemp;
 		msgTemp.validity = '!';
-		msgTemp.address = 'X';
-		msgTemp.cmd = DISPENSE;
+		msgTemp.address = 'Z';
+		msgTemp.cmd = 'a';
 		push(msgTemp,&f1);
 		msgTemp.validity = '!';
 		msgTemp.address = 'Y';
-		msgTemp.cmd = DISPENSE;
+		msgTemp.cmd = 'a';
 		push(msgTemp,&f1);
 	#endif
 	/***** END DEBUGGING INITIALIZATION LOGIC *****/
 	
 	while(1){	
+		
 		if(timeout0) { // handle timeout0 
 			//restartTransaction();
 			timeout0Counter++;
@@ -110,12 +111,16 @@ int main(void)
 		{
 			debuggingCounter++;
 			//Simulating incoming commands via uart interrupt
-			//if ( isEmpty(&f1) && debuggingCounter > 65000){ // if no outstanding commands and no outstanding responses
-				//struct message msgTemp;
-				//msgTemp.validity = '!';
-				//msgTemp.address = 'X';
-				//msgTemp.cmd = DISPENSE;
-				//push(msgTemp,&f1);
+			if ( isEmpty(&f1)){// && debuggingCounter > 65000){ // if no outstanding commands and no outstanding responses
+				struct message msgTemp;
+				msgTemp.validity = '!';
+				msgTemp.address = 'Z';
+				msgTemp.cmd = '10';
+				push(msgTemp,&f1);
+				msgTemp.validity = '!';
+				msgTemp.address = 'Y';
+				msgTemp.cmd = 10;
+				push(msgTemp,&f1);
 				//msgTemp.validity = '!';
 				//msgTemp.address = 'Y';
 				//msgTemp.cmd = DISPENSE;
@@ -125,7 +130,7 @@ int main(void)
 				//msgTemp.cmd = DISPENSE;
 				//push(msgTemp,&f1);
 				//debuggingCounter = 0;				
-			//}
+			}
 
 		}
 		#else 
@@ -133,7 +138,7 @@ int main(void)
 			if (m1Full){ // if m1full then put onto FIFO
 				push(m1,&f1);
 				rstMsgTracker();
-				volatile unsigned char temp1 = 0;
+				
 				debuggingTemp1 = m1.validity;
 				debuggingTemp2 = m1.address;
 				debuggingTemp3 = m1.cmd;
@@ -158,15 +163,18 @@ int main(void)
 				else {
 					
 					/******* CHECK MESSAGE WITH DEBUGGER *********/
-					debuggingTemp1 = outstandingMsg.validity;
-					debuggingTemp2 = outstandingMsg.address;
-					debuggingTemp3 = outstandingMsg.cmd;
+					debuggingTempVALID = outstandingMsg.validity;
+					debuggingTempADDR = outstandingMsg.address;
+					debuggingTempCMD = outstandingMsg.cmd;
 					asm volatile ("nop");
 					/*********************************************/
+					//for (int i = 0; i < 10; i++)
+					{
 					USART1_transmit(outstandingMsg.address, ADDRESS_MSG);
 					USART1_transmit(outstandingMsg.cmd, DATA_MSG);
 					TIMER0_enable();// set timer interrupt for how long to wait for response
 					waitingForResp = 1; // waiting on response
+					}
 				}
 				//outStandingCmds=0; // command sent // REPLACED BY FIFO
 			}
@@ -183,7 +191,6 @@ int main(void)
 				clearReceiveBuffer();
 				// set other error output bits
 			}
-
 			else 
 			{ // if receive successful!
 				pop(&f1); // remove msg from FIFO, message handled
@@ -192,7 +199,6 @@ int main(void)
 				transmitUART0(msgResp); // not actually zero, verified with Abel, MAKE SURE MSG RESP IS SENDING '1'
 				transmitUART0('#');
 			}
-			
 		}
 	}
 }

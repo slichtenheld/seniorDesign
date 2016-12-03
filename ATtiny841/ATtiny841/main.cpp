@@ -42,7 +42,7 @@ int main(void)
 {
 	// initialize PORTB as outputs for debug purposes
 	DDRB = 0b111;
-	PORTB = 0b111;
+	//PORTB = 0b111;
 	fullRotation();
 	//PORTB = 0;
 	//DDRA = 0b1111;
@@ -57,7 +57,7 @@ int main(void)
 	msgRqst = 0;
 	mode = MPCM_MODE;
 	PORTB = 0;
-	PORTB = 7;
+	//PORTB = 7;
 	
 	while(1) { // infinite loop checking for outstanding requests
 		
@@ -72,6 +72,7 @@ int main(void)
 			
 			PORTB &= ~(1<<DDRB2);
 			switch (msgStatus){
+				// for all errors no need to send response -> MCU will automatically resend data
 				case (FRAMEERROR):
 					//clearReceiveBuffer();
 					//PORTB &= ~(1<<DDRB2);
@@ -88,27 +89,29 @@ int main(void)
 					//USART1_transmit(slaveParityError, DATA_MSG);
 					break;
 				default: // no receive error
-						//PORTB = 0b111;
-						//PORTB = 0;
+
 						switch(msgRqst){
 							case (DISPENSE):
 								USART1_transmit('1', DATA_MSG);
 								fullRotation();
-								
 								//PORTB &= ~(1<<DDRB0);
 								break;
 							case (STATUS):
 								USART1_transmit('1', DATA_MSG);
 								//PORTB &= ~(1<<DDRB1);
 								break;
+							default:
+								USART1_transmit(COMMANDINVALID, DATA_MSG);
 						}
 			}
 			outstandingRqsts = 0;
+			
 		}
 	}
 }
 
 ISR(USART1_RX_vect) {
+	PORTB = 0b111;
 	unsigned char msgTemp;
 	volatile int8_t errorTemp = 0;
 	errorTemp = USART1_receive(&msgTemp);
